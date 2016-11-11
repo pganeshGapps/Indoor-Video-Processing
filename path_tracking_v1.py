@@ -12,6 +12,7 @@ import cv2
 from math import sqrt
 import random
 from nms import non_max_suppression_fast
+import datetime
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
@@ -38,9 +39,10 @@ else:
 	camera = cv2.VideoCapture(args["video"])
 
 old_circles = []
-
+z = False
 # keep looping
 while True:
+	text = "Not Occupied"
 	# grab the current frame
 	(grabbed, frame) = camera.read();
 
@@ -49,7 +51,7 @@ while True:
 	if args.get("video") and not grabbed:
 		break
 
-	frame = imutils.resize(frame, width=600)
+	frame = imutils.resize(frame, width=500)
 
 	# detect people in the frame
 	(rects, weights) = hog.detectMultiScale(frame, winStride=(4	, 4), padding=(8, 8), scale=1.05)
@@ -62,7 +64,7 @@ while True:
 			flag = False
 			for (xA, yA, xB, yB) in pick:
 				(A,B) = ((xA+xB)/2, (yA+yB)/2)
-				if( sqrt( (A - xC)**2 + (B - yC)**2 ) <= 50) :
+				if( sqrt( (A - xC)**2 + (B - yC)**2 ) <= 20) :
 					flag = True
 					path[(A,B)] = path[(xC,yC)]
 					color[(A,B)] = color[(xC,yC)]
@@ -81,15 +83,28 @@ while True:
 	for (xA, yA, xB, yB) in pick:
 		cv2.rectangle(frame, (xA, yA), (xB, yB), (0, 255, 0), 2)
 		(A,B) = ((xA+xB)/2, (yA+yB)/2)
+		if A<frame.shape[0]/2 and B<frame.shape[1]/2 :
+			text = "Alert"
 		cv2.circle(frame, (A,B), 1, (0, 0, 255), -1)
 		old_circles.append((A,B))
 		if (A,B) not in path :
 			print (str((A,B))+" not in path")
-			color[(A,B)] = (random.randint(0,255),random.randint(0,255),random.randint(0,255))
+			if not z :
+				color[(A,B)] = (0,0,200)
+				z = True
+			else :
+				color[(A,B)] = (random.randint(0,255),random.randint(0,255),random.randint(0,255))
 			check[(A,B)] = 0
 			path[(A,B)] = deque()
 		path[(A,B)].appendleft(((xA+xB)/2,yB))
 		check[(A,B)] = check[(A,B)] + 1
+
+	text1  = "Not Crowded"
+	# crowd detection
+	for c1 in old_circles :
+		for c2 in old_circles :
+			if c1!=c2 and sqrt( (c1[0] - c2[0])**2 + (c1[1] - c2[1])**2 ) <= 50 :
+				text1 = "Crowded"
 
 	# printing paths
 	for k in path :
@@ -106,6 +121,13 @@ while True:
 			cv2.line(frame, path[k][i - 1], path[k][i], color[k], 2)
 
 	print("---- next frame ----")
+	cv2.rectangle(frame, (0, 0), (frame.shape[0]/2, frame.shape[1]/2), (255, 0, 0), 2)
+	cv2.putText(frame, "Status : {}".format(text1), (frame.shape[0]/2+50, 20),
+		cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+	cv2.putText(frame, "Status : {}".format(text), (10, 20),
+		cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+	cv2.putText(frame, datetime.datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"),
+		(10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
 	cv2.imshow("Human Tracking",frame)
 	key = cv2.waitKey(1) & 0xFF
 	# if the 'q' key is pressed, stop the loop
