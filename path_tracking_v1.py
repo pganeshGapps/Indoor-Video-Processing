@@ -55,9 +55,17 @@ while True:
 
 	# detect people in the frame
 	(rects, weights) = hog.detectMultiScale(frame, winStride=(4	, 4), padding=(8, 8), scale=1.05)
-	rects = np.array([[x, y, x + w, y + h] for (x, y, w, h) in rects])
-	pick = non_max_suppression_fast(rects, overlapThresh=0.65)
+	print weights
+	tt = []
+	for i in range(0,len(weights)) :
+		if weights[i] > 1.1 :
+			(x, y, w, h) = rects[i]
+			tt.append([x,y,x+w,y+h])
+	rects = np.array(tt)
+	#rects = np.array([[x, y, x + w, y + h] for (x, y, w, h) in rects])
 
+	pick = non_max_suppression_fast(rects, overlapThresh=0.65)
+	
 	# connecting new points to old paths
 	if old_circles :
 		for (xC,yC) in old_circles :
@@ -93,10 +101,10 @@ while True:
 				color[(A,B)] = (0,0,200)
 				z = True
 			else :
-				color[(A,B)] = (random.randint(0,255),random.randint(0,255),random.randint(0,255))
+				color[(A,B)] = (0,255,255)#(random.randint(0,255),random.randint(0,255),random.randint(0,255))
 			check[(A,B)] = 0
 			path[(A,B)] = deque()
-		path[(A,B)].appendleft(((xA+xB)/2,yB))
+		path[(A,B)].appendleft(((xA+xB)/2,(yA+5*yB)/6))
 		check[(A,B)] = check[(A,B)] + 1
 
 	text1  = "Not Crowded"

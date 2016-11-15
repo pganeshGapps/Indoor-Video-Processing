@@ -13,7 +13,8 @@ from math import sqrt
 import random
 from nms import non_max_suppression_fast
 import datetime
-
+import time
+import os
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-v", "--video",
@@ -25,6 +26,11 @@ path = {}	# deque storing path of humans
 color = {}	# color of path
 check = {}	# number of points in path
 
+ticks = time.time()
+starttime = 10
+timelimit = 20
+
+firstFrame = None
 # initialize the HOG descriptor/person detector
 hog = cv2.HOGDescriptor()
 hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
@@ -40,7 +46,6 @@ else:
 
 old_circles = []
 z = False
-firstFrame = None
 # keep looping
 while True:
 	text = "Not Occupied"
@@ -115,20 +120,20 @@ while True:
 		cv2.rectangle(frame, (minx, miny), (maxx, maxy), (0, 0, 255), 2)
 
 ############ BACKGROUND SUBTRACTION
-
 	# detect people in the frame
-	(rects, weights) = hog.detectMultiScale(frame, winStride=(2	, 2), padding=(8, 8), scale=1.05)
-	rects = np.array([[x, y, x + w, y + h] for (x, y, w, h) in rects])
-	pick = non_max_suppression_fast(rects, overlapThresh=0.65)
-	for (x1,y1,x2,y2) in pick :
-		(a,b) = ((x1+x2)/2,(y1+y2)/2)
-		for (x3,y3,x4,y4) in pick2 :
-			(c,d) = ((x3+x4)/2,(y3+y4)/2)
-			if sqrt((a-c)*(a-c)+(b-d)*(b-d)) < 50 :
-				cv2.rectangle(frame,(x1,y1),(x2,y2),(0,255,0),2)
-			else :
-				cv2.rectangle(frame,(x3,y3),(x4,y4),(0,0,255),2)
+	(rects, weights) = hog.detectMultiScale(frame, winStride=(4	, 4), padding=(8, 8), scale=1.05)
+	print weights
+	tt = []
+	for i in range(0,len(weights)) :
+		if weights[i] > 1.1 :
+			(x, y, w, h) = rects[i]
+			tt.append([x,y,x+w,y+h])
+	rects = np.array(tt)
+	#rects = np.array([[x, y, x + w, y + h] for (x, y, w, h) in rects])
 
+	pick = non_max_suppression_fast(rects, overlapThresh=0.65)
+	
+	# connecting new points to old paths
 	if old_circles :
 		for (xC,yC) in old_circles :
 			flag = False
@@ -148,14 +153,13 @@ while True:
 				del color[(xC,yC)]
 				del check[(xC,yC)]
 
-
 	old_circles = []
     # appending new points to paths
 	for (xA, yA, xB, yB) in pick:
 		cv2.rectangle(frame, (xA, yA), (xB, yB), (0, 255, 0), 2)
 		(A,B) = ((xA+xB)/2, (yA+yB)/2)
 		if A<frame.shape[0]/2 and B<frame.shape[1]/2 :
-			text = "Alert"
+			text = "Occupied"
 		cv2.circle(frame, (A,B), 1, (0, 0, 255), -1)
 		old_circles.append((A,B))
 		if (A,B) not in path :
@@ -164,10 +168,10 @@ while True:
 				color[(A,B)] = (0,0,200)
 				z = True
 			else :
-				color[(A,B)] = (random.randint(0,255),random.randint(0,255),random.randint(0,255))
+				color[(A,B)] = (0,255,255)#(random.randint(0,255),random.randint(0,255),random.randint(0,255))
 			check[(A,B)] = 0
 			path[(A,B)] = deque()
-		path[(A,B)].appendleft(((xA+xB)/2,yB))
+		path[(A,B)].appendleft(((xA+xB)/2,(yA+5*yB)/6))
 		check[(A,B)] = check[(A,B)] + 1
 
 	text1  = "Not Crowded"
@@ -192,13 +196,13 @@ while True:
 			cv2.line(frame, path[k][i - 1], path[k][i], color[k], 2)
 
 	print("---- next frame ----")
-	cv2.rectangle(frame, (0, 0), (frame.shape[0]/2, frame.shape[1]/2), (255, 0, 0), 2)
-	cv2.putText(frame, "Status : {}".format(text1), (frame.shape[0]/2+50, 20),
-		cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-	cv2.putText(frame, "Status : {}".format(text), (10, 20),
-		cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-	cv2.putText(frame, datetime.datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"),
-		(10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
+	#cv2.rectangle(frame, (0, 0), (frame.shape[0]/2, frame.shape[1]/2), (255, 0, 0), 2)
+	if time.time() > ticks + starttime and time.time() < ticks + starttime + timelimit :
+		cv2.putText(frame, "Status : {}".format("ALERT"), (frame.shape[0]/2+100, 20),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+		#os.system('say "beep"')
+	#cv2.putText(frame, "Status : {}".format(text1), (frame.shape[0]/2+50, 20),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+	cv2.putText(frame, "Status : {}".format(text), (10, 20),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+	cv2.putText(frame, datetime.datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"),	(10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
 	cv2.imshow("Human Tracking",frame)
 	key = cv2.waitKey(1) & 0xFF
 	# if the 'q' key is pressed, stop the loop
